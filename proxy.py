@@ -3,10 +3,10 @@ import threading
 import os
 import time
 
-HOST = "172.24.174.243"  # IP Proxy Anda
+HOST = "0.0.0.0"  # Menggunakan 0.0.0.0 agar bisa mendengarkan semua koneksi masuk (menghindari error WinError 10049)
 PORT = 8080
 
-SERVER_HOST = "172.24.174.181"  # IP Web Server teman
+SERVER_HOST = "10.244.198.181"  # IP Web Server teman
 SERVER_PORT = 8000
 
 # Spek: Menyimpan response HTTP ke "local storage"

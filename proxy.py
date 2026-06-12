@@ -12,7 +12,7 @@ SERVER_PORT = 8000
 # Spek: Menyimpan response HTTP ke "local storage"
 CACHE_DIR = "proxy_cache"
 if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR)
+    os.makedirs(CACHE_DIR),
 
 def handle_client(client_socket, address):
     start_time = time.time()

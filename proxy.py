@@ -12,7 +12,7 @@ CACHE_DIR = "proxy_cache"
 if not os.path.exists(CACHE_DIR):
     os.makedirs(CACHE_DIR)
 
-def handle_client(client_socket, client_address):
+def handle_tcp_client(client_socket, client_address):
     start_time = time.time()
     client_ip = client_address[0]
     
@@ -76,25 +76,57 @@ def handle_client(client_socket, client_address):
         client_socket.send(response_data)
         
         response_time = time.time() - start_time
-        print(f"[LOG] IP: {client_ip} | URL: {url} | Status: {status} | Waktu: {response_time:.4f}s")
+        print(f"[TCP LOG] IP: {client_ip} | URL: {url} | Status: {status} | Waktu: {response_time:.4f}s")
         
     except Exception as e:
-        print(f"Error pada client {client_ip}: {e}")
+        print(f"Error TCP pada client {client_ip}: {e}")
         
     finally:
         client_socket.close()
 
-proxy_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-proxy_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-proxy_server.bind((HOST, PORT))
-proxy_server.listen(50)
+def start_tcp_proxy():
+    proxy_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    proxy_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    proxy_server.bind((HOST, PORT))
+    proxy_server.listen(50)
+    print(f"Proxy Server (TCP) Berjalan di Port {PORT}")
 
-print(f"Proxy Server Berjalan di Port {PORT}")
+    while True:
+        client_socket, client_address = proxy_server.accept()
+        client_thread = threading.Thread(
+            target=handle_tcp_client, 
+            args=(client_socket, client_address)
+        )
+        client_thread.start()
 
-while True:
-    client_socket, client_address = proxy_server.accept()
-    client_thread = threading.Thread(
-        target=handle_client, 
-        args=(client_socket, client_address)
-    )
-    client_thread.start()
+def start_udp_proxy():
+    proxy_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    proxy_udp.bind((HOST, 9000))
+    print(f"Proxy Forwarder (UDP) Berjalan di Port 9000")
+    
+    while True:
+        data, client_addr = proxy_udp.recvfrom(1024)
+        print(f"[UDP LOG] Meneruskan PING dari {client_addr[0]} ke Web Server")
+        
+        # Buat socket sementara untuk menghubungi Web Server
+        temp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        temp_socket.settimeout(2.0)
+        
+        try:
+            # Lempar ke Web Server
+            temp_socket.sendto(data, (SERVER_HOST, 9000))
+            
+            # Terima pantulan dari Web Server
+            response_data, _ = temp_socket.recvfrom(1024)
+            
+            # Kembalikan pantulan itu ke Client
+            proxy_udp.sendto(response_data, client_addr)
+        except socket.timeout:
+            pass # Abaikan jika timeout, Client yang akan mencatat Packet Loss
+        finally:
+            temp_socket.close()
+
+if __name__ == "__main__":
+    # Jalankan Proxy TCP dan UDP secara bersamaan
+    threading.Thread(target=start_tcp_proxy, daemon=True).start()
+    start_udp_proxy()

@@ -2,20 +2,27 @@ import socket
 import time
 import argparse
 
+<<<<<<< HEAD
 # Konfigurasi IP dan Port sesuai dengan file proxy.py dan webserver.py
 PROXY_HOST = "192.168.100.16"  # IP Proxy
 PROXY_PORT = 8080              # Port Proxy TCP
 
 SERVER_HOST = "192.168.100.123" # IP Web Server
 UDP_PORT = 9000                # Port UDP Web Server (Echo Server)
+=======
+# Konfigurasi HANYA menggunakan IP Proxy
+PROXY_HOST = "10.244.198.243"  # IP Proxy
+PROXY_PORT_TCP = 8080          # Port Proxy TCP (HTTP)
+PROXY_PORT_UDP = 9000          # Port Proxy UDP (Forwarder QoS)
+>>>>>>> 757dd6c573ea5f1f4965e4e4792af3f2b1f98f8a
 
 def run_tcp():
     """Fungsi untuk menjalankan mode TCP (HTTP Request via Proxy)"""
-    print(f"[*] Menghubungi Proxy Server di {PROXY_HOST}:{PROXY_PORT}")
+    print(f"[*] Menghubungi Proxy Server (TCP) di {PROXY_HOST}:{PROXY_PORT_TCP}")
     try:
         # Inisiasi socket TCP
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((PROXY_HOST, PROXY_PORT))
+        client_socket.connect((PROXY_HOST, PROXY_PORT_TCP))
         
         # Format HTTP Request
         request = f"GET /index.html HTTP/1.1\r\nHost: {PROXY_HOST}\r\n\r\n"
@@ -38,8 +45,13 @@ def run_tcp():
         client_socket.close()
 
 def run_udp():
+<<<<<<< HEAD
     """Fungsi untuk menjalankan mode UDP (QoS Test ke Server langsung via Proxy)"""
     print(f"[*] Mengirim paket QoS (UDP) ke {PROXY_HOST}:{UDP_PORT}")
+=======
+    """Fungsi untuk menjalankan mode UDP (QoS Test via Proxy)"""
+    print(f"[*] Mengirim paket QoS (UDP) ke Proxy di {PROXY_HOST}:{PROXY_PORT_UDP}")
+>>>>>>> 757dd6c573ea5f1f4965e4e4792af3f2b1f98f8a
     
     # Inisiasi socket UDP
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,7 +70,12 @@ def run_udp():
         message = f"Ping {i} {send_time}"
         
         try:
+<<<<<<< HEAD
             client_socket.sendto(message.encode(), (PROXY_HOST, UDP_PORT))
+=======
+            # Mengirim ke PROXY_HOST, bukan SERVER_HOST
+            client_socket.sendto(message.encode(), (PROXY_HOST, PROXY_PORT_UDP))
+>>>>>>> 757dd6c573ea5f1f4965e4e4792af3f2b1f98f8a
             data, addr = client_socket.recvfrom(1024)
             recv_time = time.time()
             
@@ -68,7 +85,7 @@ def run_udp():
             received += 1
             total_bytes += len(data)
             
-            print(f"Reply dari {addr[0]}: seq={i} time={rtt:.2f} ms")
+            print(f"Reply dari Proxy {addr[0]}: seq={i} time={rtt:.2f} ms")
         except socket.timeout:
             print(f"Request timeout untuk seq={i}")
             
@@ -99,7 +116,7 @@ def run_udp():
 if __name__ == "__main__":
     # Parsing argumen command line
     parser = argparse.ArgumentParser(description="Client untuk Tugas Besar Jaringan Komputer")
-    parser.add_argument('--mode', choices=['tcp', 'udp'], required=True, help="Pilih mode: tcp (HTTP via Proxy) atau udp (QoS monitoring)")
+    parser.add_argument('--mode', choices=['tcp', 'udp'], required=True, help="Pilih mode: tcp (HTTP via Proxy) atau udp (QoS monitoring via Proxy)")
     
     args = parser.parse_args()
     

@@ -3,117 +3,98 @@ import threading
 import os
 import time
 
-HOST = "0.0.0.0"  # Menggunakan 0.0.0.0 agar bisa mendengarkan semua koneksi masuk (menghindari error WinError 10049)
+HOST = "0.0.0.0"
 PORT = 8080
-
-SERVER_HOST = "10.244.198.181"  # IP Web Server teman
+SERVER_HOST = "192.168.100.123"
 SERVER_PORT = 8000
-
-# Spek: Menyimpan response HTTP ke "local storage"
 CACHE_DIR = "proxy_cache"
-if not os.path.exists(CACHE_DIR):
-    os.makedirs(CACHE_DIR),
 
-def handle_client(client_socket, address):
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+
+def handle_client(client_socket, client_address):
     start_time = time.time()
-    client_ip = address[0]
+    client_ip = client_address[0]
     
     try:
-        # Terima request dari client
-        request = client_socket.recv(4096)
-        if not request:
+        request_data = client_socket.recv(4096)
+        if not request_data:
             client_socket.close()
             return
             
-        request_str = request.decode(errors='ignore')
+        request_string = request_data.decode(errors='ignore')
+        parts = request_string.split(' ')
         
-        # Spek: Ekstrak URL untuk Logging
-        try:
-            url = request_str.split(' ')[1]
-        except IndexError:
+        if len(parts) > 1:
+            url = parts[1]
+        else:
             url = "/"
             
-        # Penamaan file cache di local storage
         safe_url = url.replace("/", "_")
-        if safe_url == "_" or safe_url == "":
+        if safe_url == "" or safe_url == "_":
             safe_url = "_index.html"
+            
         cache_path = os.path.join(CACHE_DIR, safe_url)
         
-        # Spek: Cek Cache (HIT/MISS)
         if os.path.exists(cache_path):
-            # --- CACHE HIT ---
-            with open(cache_path, "rb") as f:
-                response = f.read()
-            client_socket.send(response)
-            
-            response_time = time.time() - start_time
-            # Spek Logging: IP Client, URL, HIT/MISS, Response Time
-            print(f"[LOG] IP: {client_ip} | URL: {url} | Status: HIT | Response Time: {response_time:.4f}s")
+            # CACHE HIT
+            with open(cache_path, "rb") as file:
+                response_data = file.read()
+            status = "HIT"
             
         else:
-            # --- CACHE MISS ---
+            # CACHE MISS
             try:
-                # Hubungi Web Server
                 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                server_socket.settimeout(5.0) # Timeout 5 detik untuk cek 504
+                server_socket.settimeout(5.0)
                 server_socket.connect((SERVER_HOST, SERVER_PORT))
+                server_socket.send(request_data)
                 
-                # Forward request ke server
-                server_socket.send(request)
-                
-                # Terima response dari server
-                response = b""
+                response_data = b""
                 while True:
-                    data = server_socket.recv(4096)
-                    if len(data) > 0:
-                        response += data
-                    else:
+                    chunk = server_socket.recv(4096)
+                    if not chunk:
                         break
-                        
+                    response_data += chunk
+                
                 server_socket.close()
                 
-                # Spek: Menyimpan Cache ke Local Storage
-                with open(cache_path, "wb") as f:
-                    f.write(response)
-                    
-                # Kirim balik ke client
-                client_socket.send(response)
-                
-                response_time = time.time() - start_time
-                print(f"[LOG] IP: {client_ip} | URL: {url} | Status: MISS | Response Time: {response_time:.4f}s")
+                with open(cache_path, "wb") as file:
+                    file.write(response_data)
+                status = "MISS"
                 
             except socket.timeout:
-                # Spek Penanganan Error: 504 Gateway Timeout
-                error_504 = "HTTP/1.1 504 Gateway Timeout\r\n\r\n<h1>504 Gateway Timeout</h1>"
-                client_socket.send(error_504.encode())
-                response_time = time.time() - start_time
-                print(f"[LOG] IP: {client_ip} | URL: {url} | Status: ERROR 504 | Response Time: {response_time:.4f}s")
+                html_error = "<h1>504 Gateway Timeout</h1>"
+                response_data = ("HTTP/1.1 504 Gateway Timeout\r\n\r\n" + html_error).encode()
+                status = "ERROR 504"
                 
-            except Exception as e:
-                # Spek Penanganan Error: 502 Bad Gateway
-                error_502 = "HTTP/1.1 502 Bad Gateway\r\n\r\n<h1>502 Bad Gateway</h1>"
-                client_socket.send(error_502.encode())
-                response_time = time.time() - start_time
-                print(f"[LOG] IP: {client_ip} | URL: {url} | Status: ERROR 502 | Response Time: {response_time:.4f}s")
-
+            except Exception:
+                html_error = "<h1>502 Bad Gateway</h1>"
+                response_data = ("HTTP/1.1 502 Bad Gateway\r\n\r\n" + html_error).encode()
+                status = "ERROR 502"
+                
+        client_socket.send(response_data)
+        
+        response_time = time.time() - start_time
+        print(f"[LOG] IP: {client_ip} | URL: {url} | Status: {status} | Waktu: {response_time:.4f}s")
+        
     except Exception as e:
-        print(f"Error handling client {client_ip}: {e}")
+        print(f"Error pada client {client_ip}: {e}")
+        
     finally:
         client_socket.close()
 
-# Inisiasi Proxy Server
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST, PORT))
-server.listen(50)
+proxy_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+proxy_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+proxy_server.bind((HOST, PORT))
+proxy_server.listen(50)
 
-print(f"Proxy Server (Multithreaded) berjalan di {HOST}:{PORT}")
-print(f"Meneruskan request ke Web Server di {SERVER_HOST}:{SERVER_PORT}")
+print(f"Proxy Server Berjalan di Port {PORT}")
 
 while True:
-    # Spek: Multithreading (menangani banyak client bersamaan)
-    client_socket, address = server.accept()
-    thread = threading.Thread(
-        target=handle_client,
-        args=(client_socket, address)
+    client_socket, client_address = proxy_server.accept()
+    client_thread = threading.Thread(
+        target=handle_client, 
+        args=(client_socket, client_address)
     )
-    thread.start()
+    client_thread.start()

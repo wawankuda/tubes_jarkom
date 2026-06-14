@@ -4,9 +4,13 @@ import os
 from datetime import datetime
 
 HOST = "0.0.0.0"
-PORT = 8000
+
+TCP_PORT = 8000
+UDP_PORT = 9000
+
 
 def log_request(client_ip, filename, status):
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     print(
@@ -17,38 +21,34 @@ def log_request(client_ip, filename, status):
     )
 
 
+# ==========================
+# TCP HANDLER
+# ==========================
 def handle_client(client_socket, address):
 
     try:
 
-        request = client_socket.recv(1024).decode()
+        request = client_socket.recv(4096).decode()
 
         if not request:
-            client_socket.close()
             return
 
-        print("\n===== REQUEST =====")
+        print("\n===== TCP REQUEST =====")
         print(request)
 
-        # contoh:
-        # GET /index.html HTTP/1.1
         first_line = request.split("\r\n")[0]
-
         parts = first_line.split()
 
         if len(parts) < 2:
-            client_socket.close()
             return
 
         path = parts[1]
 
-        # jika akses root
         if path == "/":
             path = "/index.html"
 
         filename = path.lstrip("/")
 
-        # cek file ada atau tidak
         if os.path.exists(filename):
 
             with open(filename, "r", encoding="utf-8") as file:
@@ -96,48 +96,31 @@ def handle_client(client_socket, address):
 
         print("ERROR:", e)
 
-        html = """
-        <html>
-        <body>
-            <h1>500 Internal Server Error</h1>
-        </body>
-        </html>
-        """
-
-        response = (
-            "HTTP/1.1 500 Internal Server Error\r\n"
-            f"Content-Length: {len(html.encode())}\r\n"
-            "Content-Type: text/html\r\n"
-            "\r\n"
-            + html
-        )
-
-        try:
-            client_socket.send(response.encode())
-        except:
-            pass
-
     finally:
+
         client_socket.close()
 
 
-def start_server():
+# ==========================
+# TCP SERVER
+# ==========================
+def start_tcp_server():
 
     server = socket.socket(
         socket.AF_INET,
         socket.SOCK_STREAM
     )
 
-    server.bind((HOST, PORT))
+    server.bind((HOST, TCP_PORT))
     server.listen(5)
 
-    print(f"Web Server berjalan di {HOST}:{PORT}")
+    print(f"[TCP] Web Server berjalan di {HOST}:{TCP_PORT}")
 
     while True:
 
         client_socket, address = server.accept()
 
-        print(f"\nClient terhubung: {address}")
+        print(f"\n[TCP] Client terhubung: {address}")
 
         thread = threading.Thread(
             target=handle_client,
@@ -147,5 +130,52 @@ def start_server():
         thread.start()
 
 
+# ==========================
+# UDP SERVER
+# ==========================
+def start_udp_server():
+
+    udp_server = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_DGRAM
+    )
+
+    udp_server.bind((HOST, UDP_PORT))
+
+    print(f"[UDP] Echo Server berjalan di {HOST}:{UDP_PORT}")
+
+    while True:
+
+        data, addr = udp_server.recvfrom(1024)
+
+        message = data.decode()
+
+        print(
+            f"[UDP] Dari {addr} : {message}"
+        )
+
+        # Echo kembali
+        udp_server.sendto(
+            data,
+            addr
+        )
+
+
+# ==========================
+# MAIN
+# ==========================
 if __name__ == "__main__":
-    start_server()
+
+    tcp_thread = threading.Thread(
+        target=start_tcp_server
+    )
+
+    udp_thread = threading.Thread(
+        target=start_udp_server
+    )
+
+    tcp_thread.start()
+    udp_thread.start()
+
+    tcp_thread.join()
+    udp_thread.join()

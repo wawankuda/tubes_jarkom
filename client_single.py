@@ -3,10 +3,10 @@ import time
 import argparse
 
 # Konfigurasi IP dan Port sesuai dengan file proxy.py dan webserver.py
-PROXY_HOST = "172.24.174.243"  # IP Proxy
+PROXY_HOST = "192.168.100.16"  # IP Proxy
 PROXY_PORT = 8080              # Port Proxy TCP
 
-SERVER_HOST = "172.24.174.181" # IP Web Server
+SERVER_HOST = "192.168.100.123" # IP Web Server
 UDP_PORT = 9000                # Port UDP Web Server (Echo Server)
 
 def run_tcp():
@@ -38,8 +38,8 @@ def run_tcp():
         client_socket.close()
 
 def run_udp():
-    """Fungsi untuk menjalankan mode UDP (QoS Test ke Server langsung)"""
-    print(f"[*] Mengirim paket QoS (UDP) ke {SERVER_HOST}:{UDP_PORT}")
+    """Fungsi untuk menjalankan mode UDP (QoS Test ke Server langsung via Proxy)"""
+    print(f"[*] Mengirim paket QoS (UDP) ke {PROXY_HOST}:{UDP_PORT}")
     
     # Inisiasi socket UDP
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,7 +58,7 @@ def run_udp():
         message = f"Ping {i} {send_time}"
         
         try:
-            client_socket.sendto(message.encode(), (SERVER_HOST, UDP_PORT))
+            client_socket.sendto(message.encode(), (PROXY_HOST, UDP_PORT))
             data, addr = client_socket.recvfrom(1024)
             recv_time = time.time()
             

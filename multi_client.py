@@ -2,7 +2,7 @@ import threading
 import socket
 import time
 
-PROXY = ("172.24.174.243", 8080)
+PROXY = ("192.168.100.16", 8080)
 URLS = ["/index.html", "/index.html", "/page1.html", "/page2.html", "/index.html"]
 
 def fetch(i, url):
